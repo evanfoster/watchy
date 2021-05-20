@@ -1,5 +1,5 @@
 import signal
-from pathlib import Path
+import os
 import argparse
 from typing import Optional
 
@@ -87,8 +87,7 @@ async def start(
         return
     print(f"core {core_number} starting with {number_of_watches} watches")
     await config.load_kube_config(
-        config_file=str(Path(".").absolute() / "kubeconfig.yaml"),
-        context="default",
+        config_file=os.getenv('KUBECONFIG'),
         persist_config=False,
     )
     jobs = [watch_it(n, shutdown_event) for n in range(number_of_watches)]
@@ -122,7 +121,7 @@ def main():
     watch_count: int = args.watch_count
     debug: bool = args.debug
     _executor = ProcessPoolExecutor
-    cpu_count = multiprocessing.cpu_count()
+    cpu_count = min(multiprocessing.cpu_count(), watch_count)
     if debug:
         _executor = DummyExecutor
         cpu_count = 1
