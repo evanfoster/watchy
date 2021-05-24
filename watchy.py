@@ -1,7 +1,6 @@
 import signal
 import os
 import argparse
-from typing import Optional
 from pathlib import Path
 
 from kubernetes_asyncio import client, config, watch
@@ -50,7 +49,7 @@ async def watch_it(
     watcher_count: int,
     shutdown_event: multiprocessing.Event,
     watch_type: WatchTypes = WatchTypes.all,
-    namespace: Optional[str] = None,
+    namespace: str = "default",
 ) -> None:
     print(
         f"watcher {watcher_count} sleeping a random amount"
@@ -80,30 +79,43 @@ async def watch_it(
 
 
 async def start(
+    *,
     number_of_watches: int,
     shutdown_event: multiprocessing.Event,
+    watch_type: WatchTypes,
     core_number: int,
+    namespace: str,
 ) -> None:
     if shutdown_event.wait(10 * core_number):
         return
     print(f"core {core_number} starting with {number_of_watches} watches")
     await config.load_kube_config(
-        config_file=os.getenv('KUBECONFIG', str(Path('~/.kube/config').expanduser())),
+        config_file=os.getenv("KUBECONFIG", str(Path("~/.kube/config").expanduser())),
         persist_config=False,
     )
-    jobs = [watch_it(n, shutdown_event) for n in range(number_of_watches)]
+    jobs = [
+        watch_it(n, shutdown_event, watch_type=watch_type, namespace=namespace)
+        for n in range(number_of_watches)
+    ]
     await asyncio.gather(*jobs)
     print("Job's done!")
 
 
 def run(
-    number_of_watches: int, shutdown_event: multiprocessing.Event, core_number: int
+    core_number,
+    *,
+    number_of_watches: int,
+    shutdown_event: multiprocessing.Event,
+    watch_type: WatchTypes,
+    namespace: str,
 ) -> None:
     asyncio.run(
         start(
-            number_of_watches,
-            shutdown_event,
-            core_number,
+            number_of_watches=number_of_watches,
+            shutdown_event=shutdown_event,
+            watch_type=watch_type,
+            core_number=core_number,
+            namespace=namespace,
         )
     )
 
@@ -116,11 +128,19 @@ def signal_handler(shutdown_event, sig, frame) -> None:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--debug", default=False, action="store_true")
+    parser.add_argument(
+        "--watch-type",
+        default=WatchTypes.all.name,
+        choices=[enumeration.name for enumeration in WatchTypes],
+    )
+    parser.add_argument("-n", "--namespace", default="default", type=str)
     parser.add_argument("watch_count", type=int, default=50)
     args = parser.parse_args()
     print("I'm watching you...")
     watch_count: int = args.watch_count
     debug: bool = args.debug
+    watch_type = WatchTypes[args.watch_type]
+    namespace: str = args.namespace
     _executor = ProcessPoolExecutor
     cpu_count = min(multiprocessing.cpu_count(), watch_count)
     if debug:
@@ -129,7 +149,13 @@ def main():
     watch_chunks = watch_count // cpu_count
     with multiprocessing.Manager() as manager:
         shutdown_event = manager.Event()
-        chunked_watcher = functools.partial(run, watch_chunks, shutdown_event)
+        chunked_watcher = functools.partial(
+            run,
+            number_of_watches=watch_chunks,
+            shutdown_event=shutdown_event,
+            watch_type=watch_type,
+            namespace=namespace,
+        )
         signal.signal(signal.SIGINT, lambda x, y: signal_handler(shutdown_event, x, y))
 
         futures = []

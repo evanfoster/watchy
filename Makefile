@@ -2,6 +2,7 @@
 NAMESPACE?="default"
 SECRET_COUNT?="5000"
 WATCH_COUNT?="50"
+WATCH_TYPE?="all"
 
 default: run
 
@@ -21,5 +22,5 @@ create-secrets:
 	python spew.py -n $(NAMESPACE) $(SECRET_COUNT)
 
 run:
-	python watchy.py $(WATCH_COUNT)
+	python watchy.py --watch-type $(WATCH_TYPE) --namespace $(NAMESPACE) $(WATCH_COUNT)
 
