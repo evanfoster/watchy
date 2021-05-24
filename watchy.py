@@ -17,7 +17,7 @@ import itertools
 
 
 # Adapted from https://bugs.python.org/issue36054#msg353690
-def cpu_count():
+def get_cpu_count():
     cgroup_quota_file = Path('/sys/fs/cgroup/cpu/cpu.cfs_quota_us')
     cgroup_cfs_period_seconds_file = Path('/sys/fs/cgroup/cpu/cpu.cfs_period_us')
     cgroup_cpu_shares_file = Path('/sys/fs/cgroup/cpu/cpu.shares')
@@ -173,7 +173,7 @@ def main():
     watch_type = WatchTypes[args.watch_type]
     namespaces: List[str] = list(filter(None, args.namespace.split(',')))
     _executor = ProcessPoolExecutor
-    cpu_count = min(cpu_count(), watch_count)
+    cpu_count = min(get_cpu_count(), watch_count)
     if debug:
         _executor = DummyExecutor
         cpu_count = 1
