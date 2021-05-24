@@ -16,6 +16,24 @@ import enum
 import itertools
 
 
+# Adapted from https://bugs.python.org/issue36054#msg353690
+def cpu_count():
+    cgroup_quota_file = Path('/sys/fs/cgroup/cpu/cpu.cfs_quota_us')
+    cgroup_cfs_period_seconds_file = Path('/sys/fs/cgroup/cpu/cpu.cfs_period_us')
+    cgroup_cpu_shares_file = Path('/sys/fs/cgroup/cpu/cpu.shares')
+
+    if cgroup_quota_file.exists():
+        # Not useful for AWS Batch based jobs as result is -1, but works on local linux systems
+        cpu_quota = int(cgroup_quota_file.read_text().rstrip())
+    if cpu_quota != -1 and cgroup_cfs_period_seconds_file.exists():
+        cpu_period = int(cgroup_cfs_period_seconds_file.read_text().rstrip())
+        avail_cpu = int(cpu_quota / cpu_period)  # Divide quota by period and you should get num of allotted CPU to the container, rounded down if fractional.
+    elif cgroup_cpu_shares_file.exists():
+        cpu_shares = int(cgroup_cpu_shares_file.read_text().rstrip())
+        # For AWS, gives correct value * 1024.
+        avail_cpu = int(cpu_shares / 1024)
+    return avail_cpu
+
 def chunks(sequence: List, n: int):
     """Yield successive n-sized chunks from sequence."""
     for i in range(0, len(sequence), n):
@@ -153,7 +171,7 @@ def main():
     watch_type = WatchTypes[args.watch_type]
     namespaces: List[str] = list(filter(None, args.namespace.split(',')))
     _executor = ProcessPoolExecutor
-    cpu_count = min(multiprocessing.cpu_count(), watch_count)
+    cpu_count = min(cpu_count(), watch_count)
     if debug:
         _executor = DummyExecutor
         cpu_count = 1
