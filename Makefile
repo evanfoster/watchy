@@ -1,9 +1,13 @@
-.PHONY: setup run clean
+.PHONY: build setup run clean
 NAMESPACE?="default"
 SECRET_COUNT?="5000"
 WATCH_COUNT?="50"
 
 default: run
+
+build:
+	docker build -t evanfoster/secret-watchy:latest .
+	docker push evanfoster/secret-watchy:latest
 
 setup:
 	python3 -m venv venv

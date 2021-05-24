@@ -2,6 +2,7 @@ import signal
 import os
 import argparse
 from typing import Optional
+from pathlib import Path
 
 from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient
@@ -87,7 +88,7 @@ async def start(
         return
     print(f"core {core_number} starting with {number_of_watches} watches")
     await config.load_kube_config(
-        config_file=os.getenv('KUBECONFIG'),
+        config_file=os.getenv('KUBECONFIG', str(Path('~/.kube/config').expanduser())),
         persist_config=False,
     )
     jobs = [watch_it(n, shutdown_event) for n in range(number_of_watches)]
