@@ -2,6 +2,7 @@ import signal
 import os
 import argparse
 from pathlib import Path
+from typing import List
 
 from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient
@@ -12,6 +13,13 @@ import asyncio
 from concurrent.futures import Future, Executor, ProcessPoolExecutor, as_completed
 from threading import Lock
 import enum
+import itertools
+
+
+def chunks(sequence: List, n: int):
+    """Yield successive n-sized chunks from sequence."""
+    for i in range(0, len(sequence), n):
+        yield sequence[i:i + n]
 
 
 class WatchTypes(enum.Enum):
@@ -52,8 +60,10 @@ async def watch_it(
     namespace: str = "default",
 ) -> None:
     print(
-        f"watcher {watcher_count} sleeping a random amount"
+        f"watcher {watcher_count} sleeping a random amount before starting"
     )  # We're a thundering herd, but maybe this takes the edge off?
+    if watch_type != WatchTypes.all:
+        print(f"watcher {watcher_count} will be watching namespace {namespace}")
     await asyncio.sleep(random.randint(0, 4))
     async with ApiClient() as api:
         v1 = client.CoreV1Api(api)
@@ -84,7 +94,7 @@ async def start(
     shutdown_event: multiprocessing.Event,
     watch_type: WatchTypes,
     core_number: int,
-    namespace: str,
+    namespaces: List[str],
 ) -> None:
     if shutdown_event.wait(10 * core_number):
         return
@@ -93,8 +103,9 @@ async def start(
         config_file=os.getenv("KUBECONFIG", str(Path("~/.kube/config").expanduser())),
         persist_config=False,
     )
+    namespace_cycler = itertools.cycle(namespaces)
     jobs = [
-        watch_it(n, shutdown_event, watch_type=watch_type, namespace=namespace)
+        watch_it(n, shutdown_event, watch_type=watch_type, namespace=next(namespace_cycler))
         for n in range(number_of_watches)
     ]
     await asyncio.gather(*jobs)
@@ -107,7 +118,7 @@ def run(
     number_of_watches: int,
     shutdown_event: multiprocessing.Event,
     watch_type: WatchTypes,
-    namespace: str,
+    namespaces: List[str],
 ) -> None:
     asyncio.run(
         start(
@@ -115,7 +126,7 @@ def run(
             shutdown_event=shutdown_event,
             watch_type=watch_type,
             core_number=core_number,
-            namespace=namespace,
+            namespaces=namespaces,
         )
     )
 
@@ -140,7 +151,7 @@ def main():
     watch_count: int = args.watch_count
     debug: bool = args.debug
     watch_type = WatchTypes[args.watch_type]
-    namespace: str = args.namespace
+    namespaces: List[str] = list(filter(None, args.namespace.split(',')))
     _executor = ProcessPoolExecutor
     cpu_count = min(multiprocessing.cpu_count(), watch_count)
     if debug:
@@ -154,7 +165,6 @@ def main():
             number_of_watches=watch_chunks,
             shutdown_event=shutdown_event,
             watch_type=watch_type,
-            namespace=namespace,
         )
         signal.signal(signal.SIGINT, lambda x, y: signal_handler(shutdown_event, x, y))
         signal.signal(signal.SIGTERM, lambda x, y: signal_handler(shutdown_event, x, y))
@@ -163,8 +173,9 @@ def main():
         with _executor(max_workers=cpu_count) as executor:
             if debug:
                 breakpoint()
-            for core in range(cpu_count):
-                futures.append(executor.submit(chunked_watcher, core))
+            for core, namespace_chunk in zip(range(cpu_count), itertools.cycle(chunks(namespaces, cpu_count))):
+                print(namespace_chunk)
+                futures.append(executor.submit(chunked_watcher, core, namespaces=namespace_chunk))
 
             for future in as_completed(futures):
                 future.result()
