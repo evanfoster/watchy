@@ -174,7 +174,6 @@ def main():
             if debug:
                 breakpoint()
             for core, namespace_chunk in zip(range(cpu_count), itertools.cycle(chunks(namespaces, cpu_count))):
-                print(namespace_chunk)
                 futures.append(executor.submit(chunked_watcher, core, namespaces=namespace_chunk))
 
             for future in as_completed(futures):
