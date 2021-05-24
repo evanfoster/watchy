@@ -157,6 +157,7 @@ def main():
             namespace=namespace,
         )
         signal.signal(signal.SIGINT, lambda x, y: signal_handler(shutdown_event, x, y))
+        signal.signal(signal.SIGTERM, lambda x, y: signal_handler(shutdown_event, x, y))
 
         futures = []
         with _executor(max_workers=cpu_count) as executor:
