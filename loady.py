@@ -78,7 +78,7 @@ async def gab_loudly(
     async with ApiClient() as api:
         v1 = client.CoreV1Api(api)
         while not shutdown_event.is_set():
-            await v1.list_namespaced_secret(namespace=namespace, timeout_seconds=86400, _request_timeout=86400)
+            await v1.list_namespaced_secret(namespace=namespace, timeout_seconds=86400, _request_timeout=86400, _preload_content=False,)
 
 
 async def start(
