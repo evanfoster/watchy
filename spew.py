@@ -36,7 +36,6 @@ def secret(*, name: str, namespace: str) -> dict:
 async def run(secret_count: int, namespace: str):
     await config.load_kube_config(
         config_file=os.getenv('KUBECONFIG', str(Path('~/.kube/config').expanduser())),
-        context="default",
         persist_config=False,
     )
     async with client.ApiClient() as k8s_client:

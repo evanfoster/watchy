@@ -3,6 +3,7 @@ NAMESPACE?="default"
 SECRET_COUNT?="5000"
 WATCH_COUNT?="50"
 WATCH_TYPE?="all"
+LOAD_COUNT?="50"
 
 default: run
 
@@ -24,3 +25,5 @@ create-secrets:
 run:
 	python watchy.py --watch-type $(WATCH_TYPE) --namespace $(NAMESPACE) $(WATCH_COUNT)
 
+load:
+	python loady.py --namespace $(NAMESPACE) $(LOAD_COUNT)
