@@ -4,6 +4,7 @@ SECRET_COUNT?="5000"
 WATCH_COUNT?="50"
 WATCH_TYPE?="all"
 LOAD_COUNT?="50"
+RAMP_TIME?="30"
 
 default: run
 
@@ -23,7 +24,7 @@ create-secrets:
 	python spew.py -n $(NAMESPACE) $(SECRET_COUNT)
 
 run:
-	python watchy.py --watch-type $(WATCH_TYPE) --namespace $(NAMESPACE) $(WATCH_COUNT)
+	python watchy.py --ramp-time $(RAMP_TIME) --watch-type $(WATCH_TYPE) --namespace $(NAMESPACE) $(WATCH_COUNT)
 
 load:
-	python loady.py --namespace $(NAMESPACE) $(LOAD_COUNT)
+	python loady.py --ramp-time $(RAMP_TIME) --namespace $(NAMESPACE) $(LOAD_COUNT)
