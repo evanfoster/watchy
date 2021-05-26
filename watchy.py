@@ -4,6 +4,8 @@ import argparse
 from pathlib import Path
 from typing import List
 
+import aiohttp
+import aiohttp.client_exceptions
 from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient
 import multiprocessing
@@ -101,15 +103,19 @@ async def watch_it(
             args.append(namespace)
         w = watch.Watch()
         secrets = 0
-        async with w.stream(
-            *args, timeout_seconds=86400, _request_timeout=86400
-        ) as stream:
-            async for _ in stream:
-                if secrets <= 1000:
-                    secrets += 1
-                if shutdown_event.is_set():
-                    await stream.close()
-                    break
+        while not shutdown_event.is_set():
+            try:
+                async with w.stream(
+                    *args, timeout_seconds=86400, _request_timeout=86400
+                ) as stream:
+                    async for _ in stream:
+                        if secrets <= 1000:
+                            secrets += 1
+                        if shutdown_event.is_set():
+                            await stream.close()
+                            break
+            except aiohttp.client_exceptions.ClientConnectorError:
+                pass
 
 
 async def start(
