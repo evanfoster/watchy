@@ -1,6 +1,7 @@
 import signal
 import os
 import argparse
+from distutils.util import strtobool
 from pathlib import Path
 from typing import List
 
@@ -130,10 +131,15 @@ async def start(
     if shutdown_event.wait(ramp_time * core_number):
         return
     print(f"core {core_number} starting with {number_of_watches} watches")
-    await config.load_kube_config(
-        config_file=os.getenv("KUBECONFIG", str(Path("~/.kube/config").expanduser())),
-        persist_config=False,
-    )
+    if bool(strtobool(os.getenv("USE_IN_CLUSTER_CONFIG", "false"))):
+        await config.load_incluster_config()
+    else:
+        await config.load_kube_config(
+            config_file=os.getenv(
+                "KUBECONFIG", str(Path("~/.kube/config").expanduser())
+            ),
+            persist_config=False,
+        )
     namespace_cycler = itertools.cycle(namespaces)
     jobs = [
         watch_it(
