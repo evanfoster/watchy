@@ -128,9 +128,6 @@ async def start(
     namespaces: List[str],
     ramp_time: int,
 ) -> None:
-    if shutdown_event.wait(ramp_time * core_number):
-        return
-    print(f"core {core_number} starting with {number_of_watches} watches")
     if bool(strtobool(os.getenv("USE_IN_CLUSTER_CONFIG", "false"))):
         await config.load_incluster_config()
     else:
@@ -140,6 +137,9 @@ async def start(
             ),
             persist_config=False,
         )
+    if shutdown_event.wait(ramp_time * core_number):
+        return
+    print(f"core {core_number} starting with {number_of_watches} watches")
     namespace_cycler = itertools.cycle(namespaces)
     jobs = [
         watch_it(

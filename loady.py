@@ -99,9 +99,6 @@ async def start(
     namespaces: List[str],
     ramp_time: int,
 ) -> None:
-    if shutdown_event.wait(10 * core_number):
-        return
-    print(f"core {core_number} starting with {number_of_gabbers} gabbers")
     if bool(strtobool(os.getenv("USE_IN_CLUSTER_CONFIG", "false"))):
         await config.load_incluster_config()
     else:
@@ -111,6 +108,9 @@ async def start(
             ),
             persist_config=False,
         )
+    if shutdown_event.wait(10 * core_number):
+        return
+    print(f"core {core_number} starting with {number_of_gabbers} gabbers")
     namespace_cycler = itertools.cycle(namespaces)
     jobs = [
         gab_loudly(
