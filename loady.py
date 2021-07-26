@@ -100,7 +100,7 @@ async def start(
     ramp_time: int,
 ) -> None:
     if bool(strtobool(os.getenv("USE_IN_CLUSTER_CONFIG", "false"))):
-        await config.load_incluster_config()
+        config.load_incluster_config()
     else:
         await config.load_kube_config(
             config_file=os.getenv(
