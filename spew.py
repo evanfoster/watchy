@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import base64
+from distutils.util import strtobool
 import os
 import random
 import string
@@ -34,10 +35,15 @@ def secret(*, name: str, namespace: str) -> dict:
 
 
 async def run(secret_count: int, namespace: str):
-    await config.load_kube_config(
-        config_file=os.getenv("KUBECONFIG", str(Path("~/.kube/config").expanduser())),
-        persist_config=False,
-    )
+    if bool(strtobool(os.getenv("USE_IN_CLUSTER_CONFIG", "false"))):
+        config.load_incluster_config()
+    else:
+        await config.load_kube_config(
+            config_file=os.getenv(
+                "KUBECONFIG", str(Path("~/.kube/config").expanduser())
+            ),
+            persist_config=False,
+        )
     async with client.ApiClient() as k8s_client:
         # we don't want to nom all the memory we just want to spew
         chunk_size = min(1000, secret_count)
