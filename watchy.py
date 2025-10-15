@@ -16,6 +16,7 @@ from threading import Lock
 from typing import List
 
 import multiprocessing_logging
+import kubernetes_asyncio
 from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient
 
@@ -123,6 +124,14 @@ async def watch_it(
                         if shutdown_event.is_set():
                             await stream.close()
                             break
+            except kubernetes_asyncio.client.exceptions.ApiException:
+                loaded_config = await config.load_kube_config(
+                    config_file=os.getenv(
+                        "KUBECONFIG", str(Path("~/.kube/config").expanduser())
+                    ),
+                    persist_config=False,
+                )
+                await loaded_config.load_from_exec_plugin()
             except Exception:
                 logger.exception(
                     f"Watcher {watcher_count} caught exception. Continuing on."
