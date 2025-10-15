@@ -1,3 +1,4 @@
+import logging
 import signal
 import os
 import argparse
@@ -115,8 +116,9 @@ async def watch_it(
                         if shutdown_event.is_set():
                             await stream.close()
                             break
-            except aiohttp.client_exceptions.ClientConnectorError:
-                pass
+            except Exception as e:
+                logging.exception(f"Watcher {i} caught exception. Continuing on.")
+                await asyncio.sleep(1)
 
 
 async def start(
