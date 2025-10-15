@@ -1,4 +1,5 @@
 import argparse
+import aiohttp
 import asyncio
 import enum
 import functools
@@ -109,10 +110,10 @@ async def watch_it(
         args = [watch_object]
         if watch_type != WatchTypes.all:
             args.append(namespace)
-        w = watch.Watch()
         secrets = 0
         while not shutdown_event.is_set():
             try:
+                w = watch.Watch()
                 # timeout_seconds is the connection timeout
                 # _request_timeout is the data read timeout.
                 async with w.stream(
@@ -132,6 +133,9 @@ async def watch_it(
                     persist_config=False,
                 )
                 await loaded_config.load_from_exec_plugin()
+            except aiohttp.client_exceptions.ClientOSError:
+                await api.rest_client.close()
+                api.rest_client = kubernetes_asyncio.rest.RESTClientObject(api.configuration)
             except Exception:
                 logger.exception(
                     f"Watcher {watcher_count} caught exception. Continuing on."
