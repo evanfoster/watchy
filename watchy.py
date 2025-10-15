@@ -129,6 +129,11 @@ async def watch_it(
                 )
                 await asyncio.sleep(1)
 
+async def watch_for_shutdown(shutdown_event):
+    while not shutdown_event.is_set():
+        await asyncio.sleep(1)
+    loop = asyncio.get_event_loop()
+    loop.stop()
 
 async def start(
     *,
@@ -164,6 +169,7 @@ async def start(
         )
         for n in range(number_of_watches)
     ]
+    jobs.append(watch_for_shutdown(shutdown_event))
     await asyncio.gather(*jobs)
     logger.info("Job's done!")
 
