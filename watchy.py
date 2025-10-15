@@ -1,5 +1,4 @@
 import argparse
-import aiohttp
 import asyncio
 import enum
 import functools
@@ -16,8 +15,9 @@ from pathlib import Path
 from threading import Lock
 from typing import List
 
-import multiprocessing_logging
+import aiohttp
 import kubernetes_asyncio
+import multiprocessing_logging
 from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient
 
@@ -126,6 +126,9 @@ async def watch_it(
                             await stream.close()
                             break
             except kubernetes_asyncio.client.exceptions.ApiException:
+                logger.exception(
+                    f"Watcher {watcher_count} caught auth error, trying to refresh."
+                )
                 loaded_config = await config.load_kube_config(
                     config_file=os.getenv(
                         "KUBECONFIG", str(Path("~/.kube/config").expanduser())
@@ -134,19 +137,26 @@ async def watch_it(
                 )
                 await loaded_config.load_from_exec_plugin()
             except aiohttp.client_exceptions.ClientOSError:
+                logger.exception(
+                    f"Watcher {watcher_count} caught broken pipe issue, rebuilding REST client"
+                )
                 await api.rest_client.close()
-                api.rest_client = kubernetes_asyncio.rest.RESTClientObject(api.configuration)
+                api.rest_client = kubernetes_asyncio.rest.RESTClientObject(
+                    api.configuration
+                )
             except Exception:
                 logger.exception(
                     f"Watcher {watcher_count} caught exception. Continuing on."
                 )
                 await asyncio.sleep(1)
 
+
 async def watch_for_shutdown(shutdown_event):
     while not shutdown_event.is_set():
         await asyncio.sleep(1)
     loop = asyncio.get_event_loop()
     loop.stop()
+
 
 async def start(
     *,
