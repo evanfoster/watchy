@@ -1,19 +1,19 @@
-import signal
-import os
 import argparse
+import asyncio
+import functools
+import itertools
+import multiprocessing
+import os
+import random
+import signal
+from concurrent.futures import Executor, Future, ProcessPoolExecutor, as_completed
 from distutils.util import strtobool
 from pathlib import Path
+from threading import Lock
 from typing import List
 
 from kubernetes_asyncio import client, config
 from kubernetes_asyncio.client.api_client import ApiClient
-import multiprocessing
-import functools
-import random
-import asyncio
-from concurrent.futures import Future, Executor, ProcessPoolExecutor, as_completed
-from threading import Lock
-import itertools
 
 
 # Adapted from https://bugs.python.org/issue36054#msg353690

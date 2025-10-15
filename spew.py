@@ -1,13 +1,12 @@
 import argparse
 import asyncio
 import base64
-from distutils.util import strtobool
 import os
 import random
 import string
+from pathlib import Path
 
 from kubernetes_asyncio import client, config, utils
-from pathlib import Path
 
 
 def random_string(length: int) -> str:
@@ -34,8 +33,8 @@ def secret(*, name: str, namespace: str) -> dict:
     }
 
 
-async def run(secret_count: int, namespace: str):
-    if bool(strtobool(os.getenv("USE_IN_CLUSTER_CONFIG", "false"))):
+async def run(secret_count: int, namespace: str, use_in_cluster_config: bool):
+    if use_in_cluster_config:
         config.load_incluster_config()
     else:
         await config.load_kube_config(
@@ -66,10 +65,14 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("secret_count", type=int, default=50)
     parser.add_argument("-n", "--namespace", type=str, default="secretload")
+    parser.add_argument("--use-in-cluster-config", type=str, choices=["true", "false"], default=os.getenv("USE_IN_CLUSTER_CONFIG", "false"))
     args = parser.parse_args()
     secret_count: int = args.secret_count
     namespace: str = args.namespace
-    asyncio.run(run(secret_count, namespace))
+    use_in_cluster_config: bool = False
+    if args.use_in_cluster_config == "true":
+        use_in_cluster_config = True
+    asyncio.run(run(secret_count, namespace, use_in_cluster_config))
 
 
 if __name__ == "__main__":

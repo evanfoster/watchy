@@ -1,23 +1,23 @@
-import logging
-import signal
-import os
 import argparse
+import asyncio
+import enum
+import functools
+import itertools
+import logging
+import multiprocessing
+import os
+import random
+import signal
+import sys
+from concurrent.futures import Executor, Future, ProcessPoolExecutor, as_completed
 from distutils.util import strtobool
 from pathlib import Path
+from threading import Lock
 from typing import List
 
-import aiohttp
-import aiohttp.client_exceptions
+import multiprocessing_logging
 from kubernetes_asyncio import client, config, watch
 from kubernetes_asyncio.client.api_client import ApiClient
-import multiprocessing
-import functools
-import random
-import asyncio
-from concurrent.futures import Future, Executor, ProcessPoolExecutor, as_completed
-from threading import Lock
-import enum
-import itertools
 
 
 # Adapted from https://bugs.python.org/issue36054#msg353690
@@ -84,14 +84,16 @@ async def watch_it(
     shutdown_event: multiprocessing.Event,
     *,
     ramp_time: int,
+    logger,
     watch_type: WatchTypes = WatchTypes.all,
     namespace: str = "default",
 ) -> None:
-    print(
-        f"watcher {watcher_count} sleeping a random amount before starting"
+    sleep_time = random.randint(0, ramp_time)
+    logger.info(
+        f"watcher {watcher_count} sleeping a random amount ({sleep_time} seconds) before starting"
     )  # We're a thundering herd, but maybe this takes the edge off?
     if watch_type != WatchTypes.all:
-        print(f"watcher {watcher_count} will be watching namespace {namespace}")
+        logger.info(f"watcher {watcher_count} will be watching namespace {namespace}")
     await asyncio.sleep(random.randint(0, ramp_time))
     async with ApiClient() as api:
         v1 = client.CoreV1Api(api)
@@ -118,8 +120,10 @@ async def watch_it(
                         if shutdown_event.is_set():
                             await stream.close()
                             break
-            except Exception as e:
-                logging.exception(f"Watcher {i} caught exception. Continuing on.")
+            except Exception:
+                logger.exception(
+                    f"Watcher {watcher_count} caught exception. Continuing on."
+                )
                 await asyncio.sleep(1)
 
 
@@ -131,6 +135,7 @@ async def start(
     core_number: int,
     namespaces: List[str],
     ramp_time: int,
+    logger,
 ) -> None:
     if bool(strtobool(os.getenv("USE_IN_CLUSTER_CONFIG", "false"))):
         config.load_incluster_config()
@@ -143,7 +148,7 @@ async def start(
         )
     if shutdown_event.wait(ramp_time * core_number):
         return
-    print(f"core {core_number} starting with {number_of_watches} watches")
+    logger.info(f"core {core_number} starting with {number_of_watches} watches")
     namespace_cycler = itertools.cycle(namespaces)
     jobs = [
         watch_it(
@@ -152,11 +157,12 @@ async def start(
             ramp_time=ramp_time,
             watch_type=watch_type,
             namespace=next(namespace_cycler),
+            logger=logger,
         )
         for n in range(number_of_watches)
     ]
     await asyncio.gather(*jobs)
-    print("Job's done!")
+    logger.info("Job's done!")
 
 
 def run(
@@ -167,6 +173,7 @@ def run(
     watch_type: WatchTypes,
     namespaces: List[str],
     ramp_time: int,
+    logger,
 ) -> None:
     asyncio.run(
         start(
@@ -176,6 +183,7 @@ def run(
             core_number=core_number,
             namespaces=namespaces,
             ramp_time=ramp_time,
+            logger=logger,
         )
     )
 
@@ -215,6 +223,10 @@ def main():
         _executor = DummyExecutor
         cpu_count = 1
     watch_chunks = watch_count // cpu_count
+    logger = logging.getLogger(__name__)
+    logger.addHandler(logging.StreamHandler(sys.stdout))
+    logger.setLevel(logging.INFO)
+    multiprocessing_logging.install_mp_handler(logger=logger)
     with multiprocessing.Manager() as manager:
         shutdown_event = manager.Event()
         chunked_watcher = functools.partial(
@@ -223,6 +235,7 @@ def main():
             shutdown_event=shutdown_event,
             watch_type=watch_type,
             ramp_time=ramp_time,
+            logger=logger,
         )
         signal.signal(signal.SIGINT, lambda x, y: signal_handler(shutdown_event, x, y))
         signal.signal(signal.SIGTERM, lambda x, y: signal_handler(shutdown_event, x, y))
