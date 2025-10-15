@@ -107,8 +107,10 @@ async def watch_it(
         secrets = 0
         while not shutdown_event.is_set():
             try:
+                # timeout_seconds is the connection timeout
+                # _request_timeout is the data read timeout.
                 async with w.stream(
-                    *args, timeout_seconds=86400, _request_timeout=86400
+                    *args, timeout_seconds=90, _request_timeout=3600
                 ) as stream:
                     async for _ in stream:
                         if secrets <= 1000:
