@@ -65,7 +65,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("secret_count", type=int, default=50)
     parser.add_argument("-n", "--namespace", type=str, default="secretload")
-    parser.add_argument("--use-in-cluster-config", type=str, choices=["true", "false"], default=os.getenv("USE_IN_CLUSTER_CONFIG", "false"))
+    parser.add_argument(
+        "--use-in-cluster-config",
+        type=str,
+        choices=["true", "false"],
+        default=os.getenv("USE_IN_CLUSTER_CONFIG", "false"),
+    )
     args = parser.parse_args()
     secret_count: int = args.secret_count
     namespace: str = args.namespace

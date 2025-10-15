@@ -94,7 +94,10 @@ async def watch_it(
     )  # We're a thundering herd, but maybe this takes the edge off?
     if watch_type != WatchTypes.all:
         logger.info(f"watcher {watcher_count} will be watching namespace {namespace}")
-    await asyncio.sleep(random.randint(0, ramp_time))
+    await asyncio.sleep(sleep_time)
+    logger.info(
+        f"watcher {watcher_count} starting after sleeping for {sleep_time} seconds"
+    )
     async with ApiClient() as api:
         v1 = client.CoreV1Api(api)
         watches = {
@@ -223,6 +226,9 @@ def main():
         _executor = DummyExecutor
         cpu_count = 1
     watch_chunks = watch_count // cpu_count
+    print(
+        f"Watching with {watch_chunks} per CPU. CPU count: {cpu_count}, total watch count: {watch_count}"
+    )
     logger = logging.getLogger(__name__)
     logger.addHandler(logging.StreamHandler(sys.stdout))
     logger.setLevel(logging.INFO)
